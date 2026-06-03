@@ -104,3 +104,66 @@ def test_skill_rejects_duplicate_command_names() -> None:
 
 def test_demo_skill_exposes_registered_echo_command() -> None:
     assert list(skill.commands) == ["echo"]
+
+
+def test_demo_skill_run_echo_outputs_json() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        ["run", "echo", "--json", '{"text":"hello"}', "--format", "json"],
+    )
+
+    assert result.exit_code == 0
+    output = json.loads(result.stdout)
+    assert output == {"length": 5, "text": "hello"}
+
+
+def test_demo_skill_run_echo_outputs_markdown() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        ["run", "echo", "--json", '{"text":"hello"}', "--format", "markdown"],
+    )
+
+    assert result.exit_code == 0
+    assert result.stdout.startswith("```json\n")
+    assert '"length": 5' in result.stdout
+    assert '"text": "hello"' in result.stdout
+
+
+def test_demo_skill_run_echo_outputs_toon() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        ["run", "echo", "--json", '{"text":"hello"}', "--format", "toon"],
+    )
+
+    assert result.exit_code == 0
+    assert result.stdout == "text: hello\nlength: 5\n"
+
+
+def test_demo_skill_run_rejects_missing_command() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        ["run", "missing", "--json", "{}", "--format", "json"],
+    )
+
+    assert result.exit_code == 2
+    assert "Command not found: missing" in result.stderr
+
+
+def test_demo_skill_run_rejects_invalid_input() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        ["run", "echo", "--json", "{}", "--format", "json"],
+    )
+
+    assert result.exit_code == 2
+    assert "Field required" in result.stderr

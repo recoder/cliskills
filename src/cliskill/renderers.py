@@ -23,7 +23,7 @@ def render_json(value: BaseModel | dict[str, Any] | list[Any]) -> str:
 def render_markdown(value: BaseModel | dict[str, Any] | list[Any]) -> str:
     """Render a JSON-compatible value as readable Markdown."""
     data = _to_json_value(value)
-    if not isinstance(data, dict):
+    if not isinstance(data, dict) or not _is_manifest_data(data):
         return "```json\n" + json.dumps(data, indent=2, sort_keys=True) + "\n```\n"
 
     lines = [
@@ -63,6 +63,11 @@ def render_markdown(value: BaseModel | dict[str, Any] | list[Any]) -> str:
         lines.append("No capabilities declared.")
 
     return "\n".join(lines).rstrip() + "\n"
+
+
+def _is_manifest_data(data: dict[str, JsonValue]) -> bool:
+    manifest_keys = ["name", "version", "description", "commands", "capabilities"]
+    return all(key in data for key in manifest_keys)
 
 
 def render_toon(value: BaseModel | dict[str, Any] | list[Any]) -> str:

@@ -1,11 +1,15 @@
 """Skill registration and execution runtime."""
 
+import json
+import os
 from collections.abc import Callable
+from inspect import Parameter, signature
 from typing import Any, ParamSpec, TypeVar, cast
 
 import typer
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
+from .context import SkillContext
 from .manifest import create_manifest
 from .models import OutputFormat, SkillCapabilities, SkillCommand, SkillManifest
 from .renderers import render
@@ -79,6 +83,31 @@ class Skill:
             capabilities=self.capabilities,
         )
 
+    def run(self, command_name: str, json_input: str) -> BaseModel:
+        """Run a registered command with JSON input."""
+        registered_command = self._commands.get(command_name)
+        if registered_command is None:
+            raise ValueError(f"Command not found: {command_name}")
+
+        try:
+            input_data = json.loads(json_input)
+        except json.JSONDecodeError as error:
+            raise ValueError(f"Invalid JSON input: {error.msg}") from error
+
+        if registered_command.input_model is not None:
+            command_input = registered_command.input_model.model_validate(input_data)
+        else:
+            command_input = None
+
+        ctx = SkillContext(environment=os.environ)
+        result = _call_command(registered_command, command_input, ctx)
+
+        if registered_command.output_model is not None:
+            return registered_command.output_model.model_validate(result)
+        if isinstance(result, BaseModel):
+            return result
+        raise TypeError(f"Command returned unsupported result type: {type(result).__name__}")
+
     def typer_app(self) -> typer.Typer:
         """Create a Typer app exposing current meta-commands."""
         app = typer.Typer(
@@ -98,6 +127,21 @@ class Skill:
             if output_format not in ("json", "markdown", "toon"):
                 raise typer.BadParameter("Supported formats: json, markdown, toon.")
             typer.echo(render(self.manifest(), cast(OutputFormat, output_format)), nl=False)
+
+        @app.command()
+        def run(
+            command_name: str = typer.Argument(..., help="Registered command name."),
+            json_input: str = typer.Option(..., "--json", help="JSON command input."),
+            output_format: str = typer.Option("json", "--format", help="Output format."),
+        ) -> None:
+            """Run a registered skill command."""
+            if output_format not in ("json", "markdown", "toon"):
+                raise typer.BadParameter("Supported formats: json, markdown, toon.")
+            try:
+                result = self.run(command_name, json_input)
+            except (TypeError, ValueError, ValidationError) as error:
+                raise typer.BadParameter(str(error)) from error
+            typer.echo(render(result, cast(OutputFormat, output_format)), nl=False)
 
         return app
 
@@ -121,3 +165,28 @@ def _model_schema(model: type[BaseModel] | None) -> dict[str, Any] | None:
     if model is None:
         return None
     return model.model_json_schema()
+
+
+def _call_command(
+    registered_command: RegisteredCommand,
+    command_input: BaseModel | None,
+    ctx: SkillContext,
+) -> BaseModel:
+    parameters = signature(registered_command.function).parameters
+    arguments: list[Any] = []
+
+    for parameter in parameters.values():
+        if parameter.kind not in (
+            Parameter.POSITIONAL_ONLY,
+            Parameter.POSITIONAL_OR_KEYWORD,
+            Parameter.KEYWORD_ONLY,
+        ):
+            continue
+        if parameter.annotation is SkillContext:
+            arguments.append(ctx)
+        elif command_input is not None:
+            arguments.append(command_input)
+        elif parameter.default is Parameter.empty:
+            raise TypeError(f"Cannot satisfy required parameter: {parameter.name}")
+
+    return registered_command.function(*arguments)

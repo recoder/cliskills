@@ -10,6 +10,12 @@ that can emit a machine-readable manifest:
 demo-skill manifest --format json
 ```
 
+It can also run registered commands with JSON input:
+
+```bash
+demo-skill run echo --json '{"text":"hello"}' --format json
+```
+
 ## Authoring
 
 ```python
