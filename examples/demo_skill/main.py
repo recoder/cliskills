@@ -1,49 +1,43 @@
 """Demo skill entry point."""
 
-from typing import Annotated, cast
+from pydantic import BaseModel
 
-import typer
+from cliskill import Skill, SkillContext
 
-from cliskill import SkillCommand, create_manifest
-from cliskill.renderers import OutputFormat, render
-
-app = typer.Typer(
-    add_completion=False,
-    context_settings={"help_option_names": ["-h", "--help"]},
+skill = Skill(
+    name="demo-skill",
+    version="0.1.0",
+    description="Demo skill for cliskill smoke tests.",
 )
 
 
-@app.callback()
-def cli() -> None:
-    """Demo skill command group."""
+class EchoInput(BaseModel):
+    """Input for the demo echo command."""
+
+    text: str
 
 
-@app.command()
-def manifest(
-    output_format: Annotated[
-        str,
-        typer.Option("--format", help="Output format."),
-    ] = "json",
-) -> None:
-    """Emit the machine-readable demo skill manifest."""
-    if output_format not in ("json", "markdown", "toon"):
-        raise typer.BadParameter("Supported formats: json, markdown, toon.")
-    supported_format = cast(OutputFormat, output_format)
+class EchoOutput(BaseModel):
+    """Output for the demo echo command."""
 
-    demo_manifest = create_manifest(
-        name="demo-skill",
-        version="0.1.0",
-        description="Demo skill for cliskill smoke tests.",
-        commands=[
-            SkillCommand(
-                name="manifest",
-                description="Emit the machine-readable skill manifest.",
-            )
-        ],
-    )
-    typer.echo(render(demo_manifest, supported_format), nl=False)
+    text: str
+    length: int
+
+
+@skill.command(
+    name="echo",
+    description="Echo text and report its length.",
+    input_model=EchoInput,
+    output_model=EchoOutput,
+)
+def echo(input_data: EchoInput, ctx: SkillContext) -> EchoOutput:
+    """Echo text and report its length."""
+    return EchoOutput(text=input_data.text, length=len(input_data.text))
+
+
+app = skill.typer_app()
 
 
 def main() -> None:
     """Run the demo skill CLI."""
-    app()
+    skill.main()

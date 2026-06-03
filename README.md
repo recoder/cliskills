@@ -10,6 +10,43 @@ that can emit a machine-readable manifest:
 demo-skill manifest --format json
 ```
 
+## Authoring
+
+```python
+from pydantic import BaseModel
+
+from cliskill import Skill, SkillContext
+
+skill = Skill(
+    name="demo-skill",
+    version="0.1.0",
+    description="Demo skill.",
+)
+
+
+class EchoInput(BaseModel):
+    text: str
+
+
+class EchoOutput(BaseModel):
+    text: str
+    length: int
+
+
+@skill.command(
+    name="echo",
+    description="Echo text and report its length.",
+    input_model=EchoInput,
+    output_model=EchoOutput,
+)
+def echo(input_data: EchoInput, ctx: SkillContext) -> EchoOutput:
+    return EchoOutput(text=input_data.text, length=len(input_data.text))
+
+
+if __name__ == "__main__":
+    skill.main()
+```
+
 ## Development
 
 ```bash
