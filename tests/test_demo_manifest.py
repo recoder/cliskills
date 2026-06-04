@@ -116,7 +116,15 @@ def test_demo_skill_run_echo_outputs_json() -> None:
 
     assert result.exit_code == 0
     output = json.loads(result.stdout)
-    assert output == {"length": 5, "text": "hello"}
+    assert output == {
+        "artifacts": [],
+        "command": "echo",
+        "data": {"length": 5, "text": "hello"},
+        "errors": [],
+        "metadata": {},
+        "ok": True,
+        "warnings": [],
+    }
 
 
 def test_demo_skill_run_echo_outputs_markdown() -> None:
@@ -129,6 +137,8 @@ def test_demo_skill_run_echo_outputs_markdown() -> None:
 
     assert result.exit_code == 0
     assert result.stdout.startswith("```json\n")
+    assert '"command": "echo"' in result.stdout
+    assert '"ok": true' in result.stdout
     assert '"length": 5' in result.stdout
     assert '"text": "hello"' in result.stdout
 
@@ -142,7 +152,10 @@ def test_demo_skill_run_echo_outputs_toon() -> None:
     )
 
     assert result.exit_code == 0
-    assert result.stdout == "text: hello\nlength: 5\n"
+    assert "ok: true\n" in result.stdout
+    assert "command: echo\n" in result.stdout
+    assert "data:\n  text: hello\n  length: 5\n" in result.stdout
+    assert "errors: []\n" in result.stdout
 
 
 def test_demo_skill_run_rejects_missing_command() -> None:

@@ -47,3 +47,33 @@ class SkillManifest(BaseModel):
     capabilities: SkillCapabilities = Field(default_factory=SkillCapabilities)
     config: list[dict[str, Any]] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class SkillError(BaseModel):
+    """Structured error returned by operational commands."""
+
+    code: str
+    message: str
+    field: str | None = None
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class SkillArtifact(BaseModel):
+    """Artifact produced by an operational command."""
+
+    path: str
+    description: str | None = None
+    media_type: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class SkillResult(BaseModel):
+    """Standard result envelope for operational commands."""
+
+    ok: bool
+    command: str
+    data: dict[str, Any] | list[Any] | None = None
+    warnings: list[str] = Field(default_factory=list)
+    errors: list[SkillError] = Field(default_factory=list)
+    artifacts: list[SkillArtifact] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)

@@ -16,6 +16,23 @@ It can also run registered commands with JSON input:
 demo-skill run echo --json '{"text":"hello"}' --format json
 ```
 
+Operational commands return a standard result envelope:
+
+```json
+{
+  "ok": true,
+  "command": "echo",
+  "data": {
+    "text": "hello",
+    "length": 5
+  },
+  "warnings": [],
+  "errors": [],
+  "artifacts": [],
+  "metadata": {}
+}
+```
+
 ## Authoring
 
 ```python

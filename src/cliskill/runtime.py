@@ -11,7 +11,7 @@ from pydantic import BaseModel, ValidationError
 
 from .context import SkillContext
 from .manifest import create_manifest
-from .models import OutputFormat, SkillCapabilities, SkillCommand, SkillManifest
+from .models import OutputFormat, SkillCapabilities, SkillCommand, SkillManifest, SkillResult
 from .renderers import render
 
 P = ParamSpec("P")
@@ -83,7 +83,7 @@ class Skill:
             capabilities=self.capabilities,
         )
 
-    def run(self, command_name: str, json_input: str) -> BaseModel:
+    def run(self, command_name: str, json_input: str) -> SkillResult:
         """Run a registered command with JSON input."""
         registered_command = self._commands.get(command_name)
         if registered_command is None:
@@ -103,9 +103,10 @@ class Skill:
         result = _call_command(registered_command, command_input, ctx)
 
         if registered_command.output_model is not None:
-            return registered_command.output_model.model_validate(result)
+            output = registered_command.output_model.model_validate(result)
+            return _success_result(command_name, output)
         if isinstance(result, BaseModel):
-            return result
+            return _success_result(command_name, result)
         raise TypeError(f"Command returned unsupported result type: {type(result).__name__}")
 
     def typer_app(self) -> typer.Typer:
@@ -165,6 +166,14 @@ def _model_schema(model: type[BaseModel] | None) -> dict[str, Any] | None:
     if model is None:
         return None
     return model.model_json_schema()
+
+
+def _success_result(command_name: str, output: BaseModel) -> SkillResult:
+    return SkillResult(
+        ok=True,
+        command=command_name,
+        data=output.model_dump(mode="json"),
+    )
 
 
 def _call_command(
