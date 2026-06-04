@@ -166,8 +166,13 @@ def test_demo_skill_run_rejects_missing_command() -> None:
         ["run", "missing", "--json", "{}", "--format", "json"],
     )
 
-    assert result.exit_code == 2
-    assert "Command not found: missing" in result.stderr
+    assert result.exit_code == 1
+    output = json.loads(result.stdout)
+    assert output["ok"] is False
+    assert output["command"] == "missing"
+    assert output["data"] is None
+    assert output["errors"][0]["code"] == "COMMAND_NOT_FOUND"
+    assert output["errors"][0]["message"] == "Command not found: missing"
 
 
 def test_demo_skill_run_rejects_invalid_input() -> None:
@@ -178,5 +183,46 @@ def test_demo_skill_run_rejects_invalid_input() -> None:
         ["run", "echo", "--json", "{}", "--format", "json"],
     )
 
-    assert result.exit_code == 2
-    assert "Field required" in result.stderr
+    assert result.exit_code == 1
+    output = json.loads(result.stdout)
+    assert output["ok"] is False
+    assert output["command"] == "echo"
+    assert output["data"] is None
+    assert output["errors"][0]["code"] == "VALIDATION_ERROR"
+    assert output["errors"][0]["field"] == "text"
+    assert output["errors"][0]["message"] == "Field required"
+
+
+def test_demo_skill_run_rejects_invalid_json() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        ["run", "echo", "--json", "{", "--format", "json"],
+    )
+
+    assert result.exit_code == 1
+    output = json.loads(result.stdout)
+    assert output["ok"] is False
+    assert output["command"] == "echo"
+    assert output["errors"][0]["code"] == "VALIDATION_ERROR"
+    assert (
+        output["errors"][0]["message"]
+        == "Invalid JSON input: Expecting property name enclosed in double quotes"
+    )
+
+
+def test_demo_skill_run_rejects_unsupported_format_with_json_envelope() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        ["run", "echo", "--json", '{"text":"hello"}', "--format", "yaml"],
+    )
+
+    assert result.exit_code == 1
+    output = json.loads(result.stdout)
+    assert output["ok"] is False
+    assert output["command"] == "echo"
+    assert output["errors"][0]["code"] == "UNSUPPORTED_FORMAT"
+    assert output["errors"][0]["field"] == "format"

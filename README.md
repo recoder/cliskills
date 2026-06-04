@@ -33,6 +33,9 @@ Operational commands return a standard result envelope:
 }
 ```
 
+Failed operational commands use the same envelope with `ok: false` and a
+structured `errors` list.
+
 ## Authoring
 
 ```python

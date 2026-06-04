@@ -11,7 +11,14 @@ from pydantic import BaseModel, ValidationError
 
 from .context import SkillContext
 from .manifest import create_manifest
-from .models import OutputFormat, SkillCapabilities, SkillCommand, SkillManifest, SkillResult
+from .models import (
+    OutputFormat,
+    SkillCapabilities,
+    SkillCommand,
+    SkillError,
+    SkillManifest,
+    SkillResult,
+)
 from .renderers import render
 
 P = ParamSpec("P")
@@ -87,27 +94,57 @@ class Skill:
         """Run a registered command with JSON input."""
         registered_command = self._commands.get(command_name)
         if registered_command is None:
-            raise ValueError(f"Command not found: {command_name}")
+            raise SkillRunError(
+                _failure_result(
+                    command_name,
+                    SkillError(
+                        code="COMMAND_NOT_FOUND",
+                        message=f"Command not found: {command_name}",
+                    ),
+                )
+            )
 
         try:
             input_data = json.loads(json_input)
         except json.JSONDecodeError as error:
-            raise ValueError(f"Invalid JSON input: {error.msg}") from error
+            raise SkillRunError(
+                _failure_result(
+                    command_name,
+                    SkillError(
+                        code="VALIDATION_ERROR",
+                        message=f"Invalid JSON input: {error.msg}",
+                        details={"position": error.pos},
+                    ),
+                )
+            ) from error
 
-        if registered_command.input_model is not None:
-            command_input = registered_command.input_model.model_validate(input_data)
-        else:
-            command_input = None
+        try:
+            if registered_command.input_model is not None:
+                command_input = registered_command.input_model.model_validate(input_data)
+            else:
+                command_input = None
+        except ValidationError as error:
+            raise SkillRunError(_validation_failure_result(command_name, error)) from error
 
         ctx = SkillContext(environment=os.environ)
-        result = _call_command(registered_command, command_input, ctx)
+        try:
+            result = _call_command(registered_command, command_input, ctx)
 
-        if registered_command.output_model is not None:
-            output = registered_command.output_model.model_validate(result)
-            return _success_result(command_name, output)
-        if isinstance(result, BaseModel):
-            return _success_result(command_name, result)
-        raise TypeError(f"Command returned unsupported result type: {type(result).__name__}")
+            if registered_command.output_model is not None:
+                output = registered_command.output_model.model_validate(result)
+                return _success_result(command_name, output)
+            if isinstance(result, BaseModel):
+                return _success_result(command_name, result)
+            raise TypeError(f"Command returned unsupported result type: {type(result).__name__}")
+        except ValidationError as error:
+            raise SkillRunError(_validation_failure_result(command_name, error)) from error
+        except Exception as error:
+            raise SkillRunError(
+                _failure_result(
+                    command_name,
+                    SkillError(code="INTERNAL_ERROR", message=str(error)),
+                )
+            ) from error
 
     def typer_app(self) -> typer.Typer:
         """Create a Typer app exposing current meta-commands."""
@@ -137,11 +174,21 @@ class Skill:
         ) -> None:
             """Run a registered skill command."""
             if output_format not in ("json", "markdown", "toon"):
-                raise typer.BadParameter("Supported formats: json, markdown, toon.")
+                result = _failure_result(
+                    command_name,
+                    SkillError(
+                        code="UNSUPPORTED_FORMAT",
+                        message="Supported formats: json, markdown, toon.",
+                        field="format",
+                    ),
+                )
+                typer.echo(render(result, "json"), nl=False)
+                raise typer.Exit(1)
             try:
                 result = self.run(command_name, json_input)
-            except (TypeError, ValueError, ValidationError) as error:
-                raise typer.BadParameter(str(error)) from error
+            except SkillRunError as error:
+                typer.echo(render(error.result, cast(OutputFormat, output_format)), nl=False)
+                raise typer.Exit(1) from error
             typer.echo(render(result, cast(OutputFormat, output_format)), nl=False)
 
         return app
@@ -162,6 +209,14 @@ class RegisteredCommand(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
 
 
+class SkillRunError(Exception):
+    """Internal exception carrying a structured run failure."""
+
+    def __init__(self, result: SkillResult) -> None:
+        super().__init__(result.errors[0].message if result.errors else "Skill run failed.")
+        self.result = result
+
+
 def _model_schema(model: type[BaseModel] | None) -> dict[str, Any] | None:
     if model is None:
         return None
@@ -173,6 +228,29 @@ def _success_result(command_name: str, output: BaseModel) -> SkillResult:
         ok=True,
         command=command_name,
         data=output.model_dump(mode="json"),
+    )
+
+
+def _failure_result(command_name: str, error: SkillError) -> SkillResult:
+    return SkillResult(
+        ok=False,
+        command=command_name,
+        data=None,
+        errors=[error],
+    )
+
+
+def _validation_failure_result(command_name: str, error: ValidationError) -> SkillResult:
+    first_error = error.errors()[0]
+    location = ".".join(str(part) for part in first_error.get("loc", ()))
+    return _failure_result(
+        command_name,
+        SkillError(
+            code="VALIDATION_ERROR",
+            message=str(first_error.get("msg", "Input is invalid.")),
+            field=location or None,
+            details={"errors": error.errors()},
+        ),
     )
 
 
