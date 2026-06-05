@@ -9,6 +9,7 @@ from .models import (
     SkillError,
     SkillManifest,
     SkillResult,
+    SkillSchema,
 )
 from .runtime import Skill
 
@@ -21,5 +22,6 @@ __all__ = [
     "SkillError",
     "SkillManifest",
     "SkillResult",
+    "SkillSchema",
     "create_manifest",
 ]

@@ -49,6 +49,14 @@ class SkillManifest(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class SkillSchema(BaseModel):
+    """Input and output schemas for one skill command."""
+
+    command: str
+    input_schema: dict[str, Any] | None = None
+    output_schema: dict[str, Any] | None = None
+
+
 class SkillError(BaseModel):
     """Structured error returned by operational commands."""
 

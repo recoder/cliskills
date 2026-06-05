@@ -18,6 +18,7 @@ from .models import (
     SkillError,
     SkillManifest,
     SkillResult,
+    SkillSchema,
 )
 from .renderers import render
 
@@ -90,19 +91,22 @@ class Skill:
             capabilities=self.capabilities,
         )
 
+    def schema(self, command_name: str) -> SkillSchema:
+        """Return input and output schemas for a registered command."""
+        registered_command = self._commands.get(command_name)
+        if registered_command is None:
+            raise SkillRunError(_command_not_found_result(command_name))
+        return SkillSchema(
+            command=command_name,
+            input_schema=registered_command.manifest.input_schema,
+            output_schema=registered_command.manifest.output_schema,
+        )
+
     def run(self, command_name: str, json_input: str) -> SkillResult:
         """Run a registered command with JSON input."""
         registered_command = self._commands.get(command_name)
         if registered_command is None:
-            raise SkillRunError(
-                _failure_result(
-                    command_name,
-                    SkillError(
-                        code="COMMAND_NOT_FOUND",
-                        message=f"Command not found: {command_name}",
-                    ),
-                )
-            )
+            raise SkillRunError(_command_not_found_result(command_name))
 
         try:
             input_data = json.loads(json_input)
@@ -167,6 +171,23 @@ class Skill:
             typer.echo(render(self.manifest(), cast(OutputFormat, output_format)), nl=False)
 
         @app.command()
+        def schema(
+            command_name: str = typer.Argument(..., help="Registered command name."),
+            output_format: str = typer.Option("json", "--format", help="Output format."),
+        ) -> None:
+            """Emit input and output schemas for a registered command."""
+            if output_format not in ("json", "markdown", "toon"):
+                result = _unsupported_format_result(command_name)
+                typer.echo(render(result, "json"), nl=False)
+                raise typer.Exit(1)
+            try:
+                schema_result = self.schema(command_name)
+            except SkillRunError as error:
+                typer.echo(render(error.result, cast(OutputFormat, output_format)), nl=False)
+                raise typer.Exit(1) from error
+            typer.echo(render(schema_result, cast(OutputFormat, output_format)), nl=False)
+
+        @app.command()
         def run(
             command_name: str = typer.Argument(..., help="Registered command name."),
             json_input: str = typer.Option(..., "--json", help="JSON command input."),
@@ -174,14 +195,7 @@ class Skill:
         ) -> None:
             """Run a registered skill command."""
             if output_format not in ("json", "markdown", "toon"):
-                result = _failure_result(
-                    command_name,
-                    SkillError(
-                        code="UNSUPPORTED_FORMAT",
-                        message="Supported formats: json, markdown, toon.",
-                        field="format",
-                    ),
-                )
+                result = _unsupported_format_result(command_name)
                 typer.echo(render(result, "json"), nl=False)
                 raise typer.Exit(1)
             try:
@@ -237,6 +251,27 @@ def _failure_result(command_name: str, error: SkillError) -> SkillResult:
         command=command_name,
         data=None,
         errors=[error],
+    )
+
+
+def _command_not_found_result(command_name: str) -> SkillResult:
+    return _failure_result(
+        command_name,
+        SkillError(
+            code="COMMAND_NOT_FOUND",
+            message=f"Command not found: {command_name}",
+        ),
+    )
+
+
+def _unsupported_format_result(command_name: str) -> SkillResult:
+    return _failure_result(
+        command_name,
+        SkillError(
+            code="UNSUPPORTED_FORMAT",
+            message="Supported formats: json, markdown, toon.",
+            field="format",
+        ),
     )
 
 

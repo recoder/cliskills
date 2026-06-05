@@ -10,6 +10,12 @@ that can emit a machine-readable manifest:
 demo-skill manifest --format json
 ```
 
+Command schemas can be inspected directly:
+
+```bash
+demo-skill schema echo --format json
+```
+
 It can also run registered commands with JSON input:
 
 ```bash
