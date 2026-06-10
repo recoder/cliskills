@@ -2,6 +2,7 @@
 
 import json
 import os
+import sys
 from collections.abc import Callable
 from inspect import Parameter, signature
 from typing import Any, ParamSpec, TypeVar, cast
@@ -190,7 +191,8 @@ class Skill:
         @app.command()
         def run(
             command_name: str = typer.Argument(..., help="Registered command name."),
-            json_input: str = typer.Option(..., "--json", help="JSON command input."),
+            json_input: str | None = typer.Option(None, "--json", help="JSON command input."),
+            use_stdin: bool = typer.Option(False, "--stdin", help="Read JSON input from stdin."),
             output_format: str = typer.Option("json", "--format", help="Output format."),
         ) -> None:
             """Run a registered skill command."""
@@ -198,8 +200,12 @@ class Skill:
                 result = _unsupported_format_result(command_name)
                 typer.echo(render(result, "json"), nl=False)
                 raise typer.Exit(1)
+            input_source_result = _resolve_run_input(command_name, json_input, use_stdin)
+            if isinstance(input_source_result, SkillResult):
+                typer.echo(render(input_source_result, cast(OutputFormat, output_format)), nl=False)
+                raise typer.Exit(1)
             try:
-                result = self.run(command_name, json_input)
+                result = self.run(command_name, input_source_result)
             except SkillRunError as error:
                 typer.echo(render(error.result, cast(OutputFormat, output_format)), nl=False)
                 raise typer.Exit(1) from error
@@ -273,6 +279,42 @@ def _unsupported_format_result(command_name: str) -> SkillResult:
             field="format",
         ),
     )
+
+
+def _input_source_failure_result(command_name: str, message: str) -> SkillResult:
+    return _failure_result(
+        command_name,
+        SkillError(
+            code="VALIDATION_ERROR",
+            message=message,
+            field="input",
+        ),
+    )
+
+
+def _resolve_run_input(
+    command_name: str,
+    json_input: str | None,
+    use_stdin: bool,
+) -> str | SkillResult:
+    if json_input is not None and use_stdin:
+        return _input_source_failure_result(
+            command_name,
+            "Use exactly one input source: --json or --stdin.",
+        )
+    if json_input is None and not use_stdin:
+        return _input_source_failure_result(
+            command_name,
+            "Missing input source. Provide --json or --stdin.",
+        )
+    if use_stdin:
+        return sys.stdin.read()
+    if json_input is None:
+        return _input_source_failure_result(
+            command_name,
+            "Missing input source. Provide --json or --stdin.",
+        )
+    return json_input
 
 
 def _validation_failure_result(command_name: str, error: ValidationError) -> SkillResult:

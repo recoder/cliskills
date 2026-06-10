@@ -22,6 +22,12 @@ It can also run registered commands with JSON input:
 demo-skill run echo --json '{"text":"hello"}' --format json
 ```
 
+Or from stdin:
+
+```bash
+echo '{"text":"hello"}' | demo-skill run echo --stdin --format json
+```
+
 Operational commands return a standard result envelope:
 
 ```json

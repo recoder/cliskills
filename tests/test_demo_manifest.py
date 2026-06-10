@@ -174,6 +174,22 @@ def test_demo_skill_run_echo_outputs_json() -> None:
     }
 
 
+def test_demo_skill_run_echo_accepts_stdin() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        ["run", "echo", "--stdin", "--format", "json"],
+        input='{"text":"hello"}',
+    )
+
+    assert result.exit_code == 0
+    output = json.loads(result.stdout)
+    assert output["ok"] is True
+    assert output["command"] == "echo"
+    assert output["data"] == {"length": 5, "text": "hello"}
+
+
 def test_demo_skill_run_echo_outputs_markdown() -> None:
     runner = CliRunner()
 
@@ -257,6 +273,38 @@ def test_demo_skill_run_rejects_invalid_json() -> None:
         output["errors"][0]["message"]
         == "Invalid JSON input: Expecting property name enclosed in double quotes"
     )
+
+
+def test_demo_skill_run_rejects_missing_input_source() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["run", "echo", "--format", "json"])
+
+    assert result.exit_code == 1
+    output = json.loads(result.stdout)
+    assert output["ok"] is False
+    assert output["command"] == "echo"
+    assert output["errors"][0]["code"] == "VALIDATION_ERROR"
+    assert output["errors"][0]["field"] == "input"
+    assert output["errors"][0]["message"] == "Missing input source. Provide --json or --stdin."
+
+
+def test_demo_skill_run_rejects_multiple_input_sources() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        ["run", "echo", "--json", '{"text":"hello"}', "--stdin", "--format", "json"],
+        input='{"text":"stdin"}',
+    )
+
+    assert result.exit_code == 1
+    output = json.loads(result.stdout)
+    assert output["ok"] is False
+    assert output["command"] == "echo"
+    assert output["errors"][0]["code"] == "VALIDATION_ERROR"
+    assert output["errors"][0]["field"] == "input"
+    assert output["errors"][0]["message"] == "Use exactly one input source: --json or --stdin."
 
 
 def test_demo_skill_run_rejects_unsupported_format_with_json_envelope() -> None:
