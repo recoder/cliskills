@@ -49,6 +49,12 @@ class SkillManifest(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class SkillCommands(BaseModel):
+    """Registered operational commands for a skill."""
+
+    commands: list[SkillCommand] = Field(default_factory=list)
+
+
 class SkillSchema(BaseModel):
     """Input and output schemas for one skill command."""
 

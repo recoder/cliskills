@@ -16,6 +16,7 @@ from .models import (
     OutputFormat,
     SkillCapabilities,
     SkillCommand,
+    SkillCommands,
     SkillError,
     SkillManifest,
     SkillResult,
@@ -81,6 +82,10 @@ class Skill:
     def commands(self) -> dict[str, SkillCommand]:
         """Return registered command metadata keyed by command name."""
         return {name: command.manifest for name, command in self._commands.items()}
+
+    def command_list(self) -> SkillCommands:
+        """Return registered operational command metadata."""
+        return SkillCommands(commands=[command.manifest for command in self._commands.values()])
 
     def manifest(self) -> SkillManifest:
         """Build the machine-readable manifest for this skill."""
@@ -170,6 +175,17 @@ class Skill:
             if output_format not in ("json", "markdown", "toon"):
                 raise typer.BadParameter("Supported formats: json, markdown, toon.")
             typer.echo(render(self.manifest(), cast(OutputFormat, output_format)), nl=False)
+
+        @app.command()
+        def commands(
+            output_format: str = typer.Option("json", "--format", help="Output format."),
+        ) -> None:
+            """List registered operational commands."""
+            if output_format not in ("json", "markdown", "toon"):
+                result = _unsupported_format_result("commands")
+                typer.echo(render(result, "json"), nl=False)
+                raise typer.Exit(1)
+            typer.echo(render(self.command_list(), cast(OutputFormat, output_format)), nl=False)
 
         @app.command()
         def schema(

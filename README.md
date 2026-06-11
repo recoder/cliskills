@@ -16,6 +16,12 @@ Command schemas can be inspected directly:
 demo-skill schema echo --format json
 ```
 
+Registered operational commands can be listed:
+
+```bash
+demo-skill commands --format json
+```
+
 It can also run registered commands with JSON input:
 
 ```bash
