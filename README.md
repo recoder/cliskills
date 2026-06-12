@@ -41,6 +41,12 @@ Generated skill documentation can be emitted as Markdown:
 demo-skill skill-md > SKILL.md
 ```
 
+Skill health checks return the standard result envelope:
+
+```bash
+demo-skill doctor --format json
+```
+
 It can also run registered commands with JSON input:
 
 ```bash

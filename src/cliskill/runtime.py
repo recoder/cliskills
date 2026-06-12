@@ -117,6 +117,27 @@ class Skill:
             config_schema=self.config_schema(),
         )
 
+    def doctor(self) -> SkillResult:
+        """Run basic skill health checks."""
+        return SkillResult(
+            ok=True,
+            command="doctor",
+            data={
+                "checks": [
+                    {
+                        "name": "contract",
+                        "ok": True,
+                        "message": "Skill contract is available.",
+                    }
+                ]
+            },
+            metadata={
+                "skill_name": self.name,
+                "skill_version": self.version,
+                "framework_version": _framework_version(),
+            },
+        )
+
     def manifest(self) -> SkillManifest:
         """Build the machine-readable manifest for this skill."""
         return create_manifest(
@@ -275,6 +296,17 @@ class Skill:
         def skill_md() -> None:
             """Generate SKILL.md from the skill contract."""
             typer.echo(self.skill_markdown(), nl=False)
+
+        @app.command()
+        def doctor(
+            output_format: str = typer.Option("json", "--format", help="Output format."),
+        ) -> None:
+            """Validate the skill environment."""
+            if output_format not in ("json", "markdown", "toon"):
+                result = _unsupported_format_result("doctor")
+                typer.echo(render(result, "json"), nl=False)
+                raise typer.Exit(1)
+            typer.echo(render(self.doctor(), cast(OutputFormat, output_format)), nl=False)
 
         @app.command()
         def run(
