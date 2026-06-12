@@ -91,6 +91,16 @@ class SkillSchema(BaseModel):
     output_schema: dict[str, Any] | None = None
 
 
+class SkillVersion(BaseModel):
+    """Framework and skill version information."""
+
+    framework_name: str = "cliskill"
+    framework_version: str
+    skill_name: str
+    skill_version: str
+    contract_version: str = "0.1"
+
+
 class SkillError(BaseModel):
     """Structured error returned by operational commands."""
 

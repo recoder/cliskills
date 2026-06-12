@@ -14,6 +14,7 @@ from .models import (
     SkillManifest,
     SkillResult,
     SkillSchema,
+    SkillVersion,
 )
 from .runtime import Skill
 
@@ -31,5 +32,6 @@ __all__ = [
     "SkillManifest",
     "SkillResult",
     "SkillSchema",
+    "SkillVersion",
     "create_manifest",
 ]

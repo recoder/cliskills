@@ -4,6 +4,7 @@ import json
 import os
 import sys
 from collections.abc import Callable
+from importlib.metadata import PackageNotFoundError, version
 from inspect import Parameter, signature
 from typing import Any, ParamSpec, TypeVar, cast
 
@@ -23,6 +24,7 @@ from .models import (
     SkillManifest,
     SkillResult,
     SkillSchema,
+    SkillVersion,
 )
 from .renderers import render
 
@@ -96,6 +98,14 @@ class Skill:
     def config_example(self) -> SkillConfigExample:
         """Return example skill configuration payloads."""
         return SkillConfigExample()
+
+    def version_info(self) -> SkillVersion:
+        """Return framework and skill version information."""
+        return SkillVersion(
+            framework_version=_framework_version(),
+            skill_name=self.name,
+            skill_version=self.version,
+        )
 
     def manifest(self) -> SkillManifest:
         """Build the machine-readable manifest for this skill."""
@@ -241,6 +251,17 @@ class Skill:
             typer.echo(render(schema_result, cast(OutputFormat, output_format)), nl=False)
 
         @app.command()
+        def version(
+            output_format: str = typer.Option("json", "--format", help="Output format."),
+        ) -> None:
+            """Emit framework and skill version information."""
+            if output_format not in ("json", "markdown", "toon"):
+                result = _unsupported_format_result("version")
+                typer.echo(render(result, "json"), nl=False)
+                raise typer.Exit(1)
+            typer.echo(render(self.version_info(), cast(OutputFormat, output_format)), nl=False)
+
+        @app.command()
         def run(
             command_name: str = typer.Argument(..., help="Registered command name."),
             json_input: str | None = typer.Option(None, "--json", help="JSON command input."),
@@ -294,6 +315,13 @@ def _model_schema(model: type[BaseModel] | None) -> dict[str, Any] | None:
     if model is None:
         return None
     return model.model_json_schema()
+
+
+def _framework_version() -> str:
+    try:
+        return version("cliskill")
+    except PackageNotFoundError:
+        return "unknown"
 
 
 def _success_result(command_name: str, output: BaseModel) -> SkillResult:

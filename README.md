@@ -29,6 +29,12 @@ demo-skill config schema --format json
 demo-skill config example --format json
 ```
 
+Version information is available as structured output:
+
+```bash
+demo-skill version --format json
+```
+
 It can also run registered commands with JSON input:
 
 ```bash
