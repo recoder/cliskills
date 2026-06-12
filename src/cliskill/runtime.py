@@ -27,7 +27,7 @@ from .models import (
     SkillSchema,
     SkillVersion,
 )
-from .renderers import render
+from .renderers import render, render_skill_markdown
 
 P = ParamSpec("P")
 R = TypeVar("R", bound=BaseModel)
@@ -108,6 +108,13 @@ class Skill:
             framework_version=_framework_version(),
             skill_name=self.name,
             skill_version=self.version,
+        )
+
+    def skill_markdown(self) -> str:
+        """Generate SKILL.md content from the skill contract."""
+        return render_skill_markdown(
+            manifest=self.manifest(),
+            config_schema=self.config_schema(),
         )
 
     def manifest(self) -> SkillManifest:
@@ -263,6 +270,11 @@ class Skill:
                 typer.echo(render(result, "json"), nl=False)
                 raise typer.Exit(1)
             typer.echo(render(self.version_info(), cast(OutputFormat, output_format)), nl=False)
+
+        @app.command("skill-md")
+        def skill_md() -> None:
+            """Generate SKILL.md from the skill contract."""
+            typer.echo(self.skill_markdown(), nl=False)
 
         @app.command()
         def run(

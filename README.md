@@ -35,6 +35,12 @@ Version information is available as structured output:
 demo-skill version --format json
 ```
 
+Generated skill documentation can be emitted as Markdown:
+
+```bash
+demo-skill skill-md > SKILL.md
+```
+
 It can also run registered commands with JSON input:
 
 ```bash
