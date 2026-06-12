@@ -19,6 +19,7 @@ from .models import (
     SkillCommand,
     SkillCommands,
     SkillConfigExample,
+    SkillConfigRequirement,
     SkillConfigSchema,
     SkillError,
     SkillManifest,
@@ -43,11 +44,13 @@ class Skill:
         version: str,
         description: str,
         capabilities: SkillCapabilities | None = None,
+        config: list[SkillConfigRequirement] | None = None,
     ) -> None:
         self.name = name
         self.version = version
         self.description = description
         self.capabilities = capabilities or SkillCapabilities()
+        self._config = config or []
         self._commands: dict[str, RegisteredCommand] = {}
 
     def command(
@@ -93,7 +96,7 @@ class Skill:
 
     def config_schema(self) -> SkillConfigSchema:
         """Return declared skill configuration requirements."""
-        return SkillConfigSchema()
+        return SkillConfigSchema(config=self._config)
 
     def config_example(self) -> SkillConfigExample:
         """Return example skill configuration payloads."""

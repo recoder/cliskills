@@ -2,7 +2,7 @@
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 
 OutputFormat = Literal["json", "markdown", "toon"]
 
@@ -64,6 +64,13 @@ class SkillConfigRequirement(BaseModel):
     default: Any | None = None
     secret: bool = False
     source: str | None = None
+
+    @field_serializer("default")
+    def serialize_default(self, value: Any | None) -> Any | None:
+        """Redact secret defaults from generated contract output."""
+        if self.secret and value is not None:
+            return "[REDACTED]"
+        return value
 
 
 class SkillConfigSchema(BaseModel):
