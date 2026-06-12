@@ -22,6 +22,13 @@ Registered operational commands can be listed:
 demo-skill commands --format json
 ```
 
+Configuration contracts can be inspected:
+
+```bash
+demo-skill config schema --format json
+demo-skill config example --format json
+```
+
 It can also run registered commands with JSON input:
 
 ```bash

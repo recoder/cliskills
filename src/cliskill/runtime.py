@@ -17,6 +17,8 @@ from .models import (
     SkillCapabilities,
     SkillCommand,
     SkillCommands,
+    SkillConfigExample,
+    SkillConfigSchema,
     SkillError,
     SkillManifest,
     SkillResult,
@@ -86,6 +88,14 @@ class Skill:
     def command_list(self) -> SkillCommands:
         """Return registered operational command metadata."""
         return SkillCommands(commands=[command.manifest for command in self._commands.values()])
+
+    def config_schema(self) -> SkillConfigSchema:
+        """Return declared skill configuration requirements."""
+        return SkillConfigSchema()
+
+    def config_example(self) -> SkillConfigExample:
+        """Return example skill configuration payloads."""
+        return SkillConfigExample()
 
     def manifest(self) -> SkillManifest:
         """Build the machine-readable manifest for this skill."""
@@ -162,6 +172,10 @@ class Skill:
             add_completion=False,
             context_settings={"help_option_names": ["-h", "--help"]},
         )
+        config_app = typer.Typer(
+            add_completion=False,
+            context_settings={"help_option_names": ["-h", "--help"]},
+        )
 
         @app.callback()
         def cli() -> None:
@@ -186,6 +200,28 @@ class Skill:
                 typer.echo(render(result, "json"), nl=False)
                 raise typer.Exit(1)
             typer.echo(render(self.command_list(), cast(OutputFormat, output_format)), nl=False)
+
+        @config_app.command("schema")
+        def config_schema(
+            output_format: str = typer.Option("json", "--format", help="Output format."),
+        ) -> None:
+            """Emit declared configuration requirements."""
+            if output_format not in ("json", "markdown", "toon"):
+                result = _unsupported_format_result("config schema")
+                typer.echo(render(result, "json"), nl=False)
+                raise typer.Exit(1)
+            typer.echo(render(self.config_schema(), cast(OutputFormat, output_format)), nl=False)
+
+        @config_app.command("example")
+        def config_example(
+            output_format: str = typer.Option("json", "--format", help="Output format."),
+        ) -> None:
+            """Emit example configuration payloads."""
+            if output_format not in ("json", "markdown", "toon"):
+                result = _unsupported_format_result("config example")
+                typer.echo(render(result, "json"), nl=False)
+                raise typer.Exit(1)
+            typer.echo(render(self.config_example(), cast(OutputFormat, output_format)), nl=False)
 
         @app.command()
         def schema(
@@ -227,6 +263,7 @@ class Skill:
                 raise typer.Exit(1) from error
             typer.echo(render(result, cast(OutputFormat, output_format)), nl=False)
 
+        app.add_typer(config_app, name="config")
         return app
 
     def main(self) -> None:
@@ -263,7 +300,7 @@ def _success_result(command_name: str, output: BaseModel) -> SkillResult:
     return SkillResult(
         ok=True,
         command=command_name,
-        data=output.model_dump(mode="json"),
+        data=output.model_dump(mode="json", by_alias=True),
     )
 
 

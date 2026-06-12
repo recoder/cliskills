@@ -55,6 +55,34 @@ class SkillCommands(BaseModel):
     commands: list[SkillCommand] = Field(default_factory=list)
 
 
+class SkillConfigRequirement(BaseModel):
+    """Declared configuration requirement for a skill."""
+
+    name: str
+    description: str
+    required: bool = False
+    default: Any | None = None
+    secret: bool = False
+    source: str | None = None
+
+
+class SkillConfigSchema(BaseModel):
+    """Declared configuration schema for a skill."""
+
+    config: list[SkillConfigRequirement] = Field(default_factory=list)
+
+
+class SkillConfigExample(BaseModel):
+    """Example configuration payloads for a skill."""
+
+    env: dict[str, str] = Field(default_factory=dict)
+    json_config: dict[str, Any] = Field(
+        default_factory=dict,
+        serialization_alias="json",
+        validation_alias="json",
+    )
+
+
 class SkillSchema(BaseModel):
     """Input and output schemas for one skill command."""
 

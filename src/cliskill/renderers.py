@@ -11,7 +11,7 @@ JsonValue = None | bool | int | float | str | list["JsonValue"] | dict[str, "Jso
 
 def _to_json_value(value: BaseModel | dict[str, Any] | list[Any]) -> JsonValue:
     if isinstance(value, BaseModel):
-        return value.model_dump(mode="json")
+        return value.model_dump(mode="json", by_alias=True)
     return value
 
 
