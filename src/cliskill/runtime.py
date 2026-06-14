@@ -3,7 +3,7 @@
 import json
 import os
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from importlib.metadata import PackageNotFoundError, version
 from inspect import Parameter, signature
 from typing import Any, ParamSpec, TypeVar, cast
@@ -117,20 +117,36 @@ class Skill:
             config_schema=self.config_schema(),
         )
 
-    def doctor(self) -> SkillResult:
+    def doctor(self, environment: Mapping[str, str] | None = None) -> SkillResult:
         """Run basic skill health checks."""
+        resolved_environment = os.environ if environment is None else environment
+        checks: list[dict[str, Any]] = [
+            {
+                "name": "contract",
+                "ok": True,
+                "message": "Skill contract is available.",
+            }
+        ]
+        errors: list[SkillError] = []
+
+        for requirement in self._config:
+            check = _config_doctor_check(requirement, resolved_environment)
+            checks.append(check)
+            if not check["ok"]:
+                errors.append(
+                    SkillError(
+                        code="CONFIG_MISSING",
+                        message=f"Required config is missing: {requirement.name}",
+                        field=requirement.name,
+                        details={"source": requirement.source or "env"},
+                    )
+                )
+
         return SkillResult(
-            ok=True,
+            ok=not errors,
             command="doctor",
-            data={
-                "checks": [
-                    {
-                        "name": "contract",
-                        "ok": True,
-                        "message": "Skill contract is available.",
-                    }
-                ]
-            },
+            data={"checks": checks},
+            errors=errors,
             metadata={
                 "skill_name": self.name,
                 "skill_version": self.version,
@@ -306,7 +322,10 @@ class Skill:
                 result = _unsupported_format_result("doctor")
                 typer.echo(render(result, "json"), nl=False)
                 raise typer.Exit(1)
-            typer.echo(render(self.doctor(), cast(OutputFormat, output_format)), nl=False)
+            result = self.doctor()
+            typer.echo(render(result, cast(OutputFormat, output_format)), nl=False)
+            if not result.ok:
+                raise typer.Exit(1)
 
         @app.command()
         def run(
@@ -369,6 +388,43 @@ def _framework_version() -> str:
         return version("cliskill")
     except PackageNotFoundError:
         return "unknown"
+
+
+def _config_doctor_check(
+    requirement: SkillConfigRequirement,
+    environment: Mapping[str, str],
+) -> dict[str, Any]:
+    source = requirement.source or "env"
+    check = {
+        "name": f"config:{requirement.name}",
+        "ok": True,
+        "message": "Configuration requirement is declared.",
+        "field": requirement.name,
+        "required": requirement.required,
+        "secret": requirement.secret,
+        "source": source,
+    }
+
+    if source != "env":
+        check["message"] = "Configuration source is not checked by doctor yet."
+        return check
+
+    has_value = bool(environment.get(requirement.name))
+    if has_value:
+        check["message"] = "Environment variable is set."
+        return check
+
+    if requirement.default is not None:
+        check["message"] = "Default value is available."
+        return check
+
+    if requirement.required:
+        check["ok"] = False
+        check["message"] = "Required environment variable is missing."
+        return check
+
+    check["message"] = "Optional environment variable is not set."
+    return check
 
 
 def _success_result(command_name: str, output: BaseModel) -> SkillResult:
